@@ -25,11 +25,26 @@ def load_news(path: str | Path) -> pd.DataFrame:
 def load_price_data(path: str | Path) -> pd.DataFrame:
     """Load historical OHLCV data and normalize numeric/date columns."""
     df = pd.read_csv(path)
+    return normalize_price_data(df)
+
+
+def normalize_price_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize historical OHLCV data from CSV files or yfinance downloads."""
+    df = df.copy()
+
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [
+            col[0] if str(col[0]).lower() in {c.lower() for c in PRICE_COLUMNS} else col[-1]
+            for col in df.columns
+        ]
+
+    if "Date" not in df.columns and df.index.name in {"Date", "Datetime"}:
+        df = df.reset_index()
+
     missing = PRICE_COLUMNS.difference(df.columns)
     if missing:
         raise ValueError(f"Price dataset is missing columns: {sorted(missing)}")
 
-    df = df.copy()
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     numeric_cols = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
     for col in numeric_cols:
