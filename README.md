@@ -9,19 +9,19 @@ with short-term price movement.
 
 ```text
 .
-├── .github/workflows/unittests.yml
-├── data/
-│   ├── raw/
-│   └── processed/
-├── notebooks/
-│   ├── 01_eda_news.ipynb
-│   ├── 02_quantitative_indicators.ipynb
-│   └── 03_sentiment_correlation.ipynb
-├── reports/
-│   └── figures/
-├── scripts/
-├── src/
-└── tests/
+|-- .github/workflows/unittests.yml
+|-- data/
+|   |-- raw/
+|   `-- processed/
+|-- notebooks/
+|   |-- 01_eda_news.ipynb
+|   |-- 02_quantitative_indicators.ipynb
+|   `-- 03_sentiment_correlation.ipynb
+|-- reports/
+|   `-- figures/
+|-- scripts/
+|-- src/
+`-- tests/
 ```
 
 ## Setup
@@ -68,9 +68,10 @@ Task 1:
 
 Task 2:
 
-- Stock price cleaning
-- SMA, EMA, RSI, MACD, and daily returns
-- Visualizations for price, moving averages, RSI, and MACD
+- Stock price cleaning and data quality checks
+- SMA, EMA, RSI, MACD, daily returns, and PyNance/fallback risk metrics
+- Visualizations for price, moving averages, RSI, MACD, cumulative return, and drawdown
+- Notebook summary of indicator interpretation and data quality limitations
 
 Task 3:
 
@@ -83,7 +84,7 @@ Task 3:
 ## Testing
 
 ```powershell
-pytest -q
+python -m pytest -q
 ```
 
 ## Report Guidance
@@ -99,4 +100,3 @@ The final Medium-style report should include:
 - Limitations and next steps
 
 Keep the final report concise and limit it to no more than 10 plots.
-
