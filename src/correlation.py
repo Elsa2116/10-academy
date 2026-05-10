@@ -1,5 +1,7 @@
 import pandas as pd
 
+from src.sentiment import classify_sentiment
+
 
 def align_news_to_trading_days(news: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
     """Map each article to the same or next available trading day for its stock."""
@@ -54,11 +56,45 @@ def sentiment_return_dataset(news_sentiment: pd.DataFrame, prices: pd.DataFrame)
         right_on=["stock", "Date"],
         how="inner",
     )
-    return merged.drop(columns=["Date"])
+    merged = merged.drop(columns=["Date"])
+    merged["sentiment_category"] = merged["avg_sentiment"].map(classify_sentiment)
+    return merged
 
 
 def pearson_correlation(dataset: pd.DataFrame) -> float:
     if len(dataset) < 2:
         return float("nan")
     return float(dataset["avg_sentiment"].corr(dataset["daily_return_pct"], method="pearson"))
+
+
+def average_return_by_sentiment(dataset: pd.DataFrame) -> pd.Series:
+    """Return average daily return for negative, neutral, and positive days."""
+    if "sentiment_category" not in dataset.columns:
+        dataset = dataset.assign(
+            sentiment_category=dataset["avg_sentiment"].map(classify_sentiment)
+        )
+    return (
+        dataset.groupby("sentiment_category")["daily_return_pct"]
+        .mean()
+        .reindex(["negative", "neutral", "positive"])
+    )
+
+
+def interpret_correlation(correlation: float) -> str:
+    """Create a concise plain-language interpretation of Pearson correlation."""
+    if pd.isna(correlation):
+        return "Not enough matched sentiment/return observations to estimate correlation."
+
+    magnitude = abs(correlation)
+    if magnitude < 0.1:
+        strength = "very weak"
+    elif magnitude < 0.3:
+        strength = "weak"
+    elif magnitude < 0.5:
+        strength = "moderate"
+    else:
+        strength = "strong"
+
+    direction = "positive" if correlation > 0 else "negative" if correlation < 0 else "flat"
+    return f"The same-day relationship is {strength} and {direction} (Pearson r={correlation:.3f})."
 
