@@ -1,7 +1,18 @@
 import pandas as pd
+import pytest
 
 from src.data_loading import normalize_price_data
-from src.indicators import add_daily_returns, add_technical_indicators, ema, macd, rsi, sma
+from src.indicators import (
+    DEFAULT_INDICATOR_PARAMS,
+    add_daily_returns,
+    add_pandas_indicators,
+    add_talib_indicators,
+    add_technical_indicators,
+    ema,
+    macd,
+    rsi,
+    sma,
+)
 from src.quant_metrics import add_financial_metrics, add_pynance_metrics
 
 
@@ -47,6 +58,34 @@ def test_add_technical_indicators_includes_task_two_columns():
     result = add_technical_indicators(prices)
     expected = {"sma_20", "sma_50", "ema_20", "rsi_14", "macd", "macd_signal", "macd_hist"}
     assert expected.issubset(result.columns)
+    assert "indicator_engine" in result.attrs
+    assert result.attrs["indicator_params"]["rsi_window"] == 14
+
+
+def test_pandas_indicator_engine_can_be_forced():
+    prices = pd.DataFrame(
+        {
+            "Close": range(1, 61),
+            "Adj Close": range(1, 61),
+        }
+    )
+    result = add_technical_indicators(prices, use_talib=False)
+    assert result.attrs["indicator_engine"] == "pandas fallback"
+    assert result.attrs["indicator_params"] == DEFAULT_INDICATOR_PARAMS
+
+
+def test_talib_indicator_engine_uses_package_when_available():
+    talib = pytest.importorskip("talib")
+    prices = pd.DataFrame(
+        {
+            "Close": range(1, 80),
+            "Adj Close": range(1, 80),
+        }
+    )
+    result = add_talib_indicators(prices)
+    expected = {"sma_20", "sma_50", "ema_20", "rsi_14", "macd", "macd_signal", "macd_hist"}
+    assert expected.issubset(result.columns)
+    assert result.attrs["indicator_engine"] == "TA-Lib"
 
 
 def test_normalize_price_data_parses_dates_and_numbers():

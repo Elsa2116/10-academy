@@ -33,6 +33,13 @@ pip install -r requirements.txt
 python -m ipykernel install --user --name news-sentiment-analysis
 ```
 
+For the preferred Task 2 TA-Lib indicator engine, install the optional TA-Lib
+requirements after the base environment is working:
+
+```powershell
+pip install -r requirements-talib.txt
+```
+
 ## Data Placement
 
 Add the FNSPID news CSV to `data/raw/`, for example:
@@ -69,9 +76,19 @@ Task 1:
 Task 2:
 
 - Stock price cleaning and data quality checks
-- SMA, EMA, RSI, MACD, daily returns, and PyNance/fallback risk metrics
+- TA-Lib-based SMA, EMA, RSI, MACD, daily returns, and PyNance/fallback risk metrics
 - Visualizations for price, moving averages, RSI, MACD, cumulative return, and drawdown
 - Notebook summary of indicator interpretation and data quality limitations
+
+Default technical-indicator settings are documented for reproducibility:
+
+- SMA windows: 20 and 50 trading sessions for short- and medium-term trend context
+- EMA span: 20 trading sessions for a more responsive trend line
+- RSI window: 14 trading sessions, interpreted with 30/70 oversold/overbought bands
+- MACD: 12-session fast EMA, 26-session slow EMA, and 9-session signal line
+
+The code prefers TA-Lib for Task 2 indicators and falls back to transparent pandas
+calculations when TA-Lib is unavailable in the local environment.
 
 Task 3:
 
