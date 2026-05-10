@@ -21,6 +21,28 @@ def publication_frequency(news: pd.DataFrame, freq: str = "D") -> pd.Series:
     return news.set_index("date").sort_index().resample(freq).size()
 
 
+def news_volume_spikes(news: pd.DataFrame, freq: str = "D", z_threshold: float = 2.0) -> pd.DataFrame:
+    """Identify unusually high publication-volume periods with z-scores."""
+    volume = publication_frequency(news, freq)
+    std = volume.std(ddof=0)
+    if std == 0 or pd.isna(std):
+        z_score = pd.Series(0.0, index=volume.index)
+    else:
+        z_score = (volume - volume.mean()) / std
+    return (
+        pd.DataFrame(
+            {
+                "period": volume.index,
+                "article_count": volume.values,
+                "z_score": z_score.values,
+            }
+        )
+        .query("z_score >= @z_threshold")
+        .sort_values(["z_score", "article_count"], ascending=False)
+        .reset_index(drop=True)
+    )
+
+
 def publishing_hour_distribution(news: pd.DataFrame) -> pd.Series:
     return news["date"].dt.hour.value_counts().sort_index()
 
@@ -33,6 +55,23 @@ def extract_publisher_domain(publisher: str) -> str:
 
 def publisher_domains(news: pd.DataFrame) -> pd.Series:
     return news["publisher"].fillna("").map(extract_publisher_domain).value_counts()
+
+
+def publisher_coverage_summary(news: pd.DataFrame, n: int = 10) -> pd.DataFrame:
+    """Summarize publisher volume, stock breadth, and active date range."""
+    return (
+        news.assign(date_only=news["date"].dt.date)
+        .groupby("publisher")
+        .agg(
+            article_count=("headline", "size"),
+            unique_stocks=("stock", "nunique"),
+            first_date=("date_only", "min"),
+            last_date=("date_only", "max"),
+        )
+        .sort_values("article_count", ascending=False)
+        .head(n)
+        .reset_index()
+    )
 
 
 def top_keywords(news: pd.DataFrame, n: int = 25) -> pd.DataFrame:
@@ -69,4 +108,24 @@ def recurring_phrases(news: pd.DataFrame, n: int = 25) -> pd.DataFrame:
         .head(n)
         .reset_index(drop=True)
     )
+
+
+def headline_theme_counts(news: pd.DataFrame) -> pd.DataFrame:
+    """Count interpretable finance themes from headline keywords."""
+    patterns = {
+        "earnings/results": r"\b(?:earnings|eps|revenue|results|profit|loss|guidance)\b",
+        "analyst ratings": r"\b(?:upgrade|downgrade|price target|rating|initiates|maintains)\b",
+        "price movement": r"\b(?:gains|falls|jumps|drops|rises|slumps|surges|trades higher|trades lower)\b",
+        "corporate actions": r"\b(?:merger|acquisition|buyback|dividend|split|offering)\b",
+        "regulatory/legal": r"\b(?:fda|approval|sec|lawsuit|probe|regulatory|patent)\b",
+    }
+    headlines = news["headline"].fillna("").str.lower()
+    rows = [
+        {
+            "theme": theme,
+            "article_count": int(headlines.str.contains(pattern, regex=True).sum()),
+        }
+        for theme, pattern in patterns.items()
+    ]
+    return pd.DataFrame(rows).sort_values("article_count", ascending=False).reset_index(drop=True)
 
