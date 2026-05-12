@@ -3,9 +3,13 @@ import pandas as pd
 
 
 DEFAULT_INDICATOR_PARAMS = {
+    # SMA windows: 20 and 50 sessions for short/medium trend context
     "sma_windows": (20, 50),
+    # EMA span: 20 sessions for responsive trend
     "ema_span": 20,
+    # RSI: 14-session window, 30/70 bands
     "rsi_window": 14,
+    # MACD: 12/26/9 (fast/slow/signal)
     "macd_fast": 12,
     "macd_slow": 26,
     "macd_signal": 9,
@@ -13,6 +17,11 @@ DEFAULT_INDICATOR_PARAMS = {
 
 
 def _load_talib():
+    """
+    Attempt to import TA-Lib for technical indicators.
+    Returns:
+        talib module if available, else None.
+    """
     try:
         import talib
     except ImportError:
@@ -21,14 +30,38 @@ def _load_talib():
 
 
 def sma(series: pd.Series, window: int) -> pd.Series:
+    """
+    Simple moving average (SMA) over specified window.
+    Parameters:
+        series (pd.Series): Input price series.
+        window (int): Window size.
+    Returns:
+        pd.Series: SMA values.
+    """
     return series.rolling(window=window, min_periods=window).mean()
 
 
 def ema(series: pd.Series, span: int) -> pd.Series:
+    """
+    Exponential moving average (EMA) over specified span.
+    Parameters:
+        series (pd.Series): Input price series.
+        span (int): EMA span.
+    Returns:
+        pd.Series: EMA values.
+    """
     return series.ewm(span=span, adjust=False).mean()
 
 
 def rsi(series: pd.Series, window: int = 14) -> pd.Series:
+    """
+    Relative Strength Index (RSI) using standard 14-session window by default.
+    Parameters:
+        series (pd.Series): Input price series.
+        window (int): RSI window size.
+    Returns:
+        pd.Series: RSI values.
+    """
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -44,6 +77,16 @@ def macd(
     slow: int = 26,
     signal: int = 9,
 ) -> pd.DataFrame:
+    """
+    Moving Average Convergence Divergence (MACD) indicator.
+    Parameters:
+        series (pd.Series): Input price series.
+        fast (int): Fast EMA span.
+        slow (int): Slow EMA span.
+        signal (int): Signal line EMA span.
+    Returns:
+        pd.DataFrame: MACD, signal, and histogram columns.
+    """
     macd_line = ema(series, fast) - ema(series, slow)
     signal_line = ema(macd_line, signal)
     histogram = macd_line - signal_line

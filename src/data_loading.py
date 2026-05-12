@@ -8,8 +8,24 @@ PRICE_COLUMNS = {"Date", "Open", "High", "Low", "Close", "Adj Close", "Volume"}
 
 
 def load_news(path: str | Path) -> pd.DataFrame:
-    """Load and lightly normalize the financial news dataset."""
-    df = pd.read_csv(path)
+    """
+    Load and lightly normalize the financial news dataset.
+
+    Parameters:
+        path (str | Path): Path to the CSV file containing news data.
+    Returns:
+        pd.DataFrame: Cleaned news DataFrame with required columns and types.
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If required columns are missing.
+    """
+    try:
+        df = pd.read_csv(path)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"News file not found at {path}. Please check the path and try again.") from e
+    except Exception as e:
+        raise RuntimeError(f"Failed to read news CSV: {e}") from e
+
     missing = NEWS_COLUMNS.difference(df.columns)
     if missing:
         raise ValueError(f"News dataset is missing columns: {sorted(missing)}")
@@ -19,17 +35,44 @@ def load_news(path: str | Path) -> pd.DataFrame:
     df["headline"] = df["headline"].fillna("").astype(str)
     df["publisher"] = df["publisher"].fillna("Unknown").astype(str)
     df["stock"] = df["stock"].fillna("").astype(str).str.upper().str.strip()
-    return df.dropna(subset=["date", "stock"])
+    df = df.dropna(subset=["date", "stock"])
+    if df.empty:
+        raise ValueError("No valid news records found after cleaning. Check input data for required fields and formats.")
+    return df
 
 
 def load_price_data(path: str | Path) -> pd.DataFrame:
-    """Load historical OHLCV data and normalize numeric/date columns."""
-    df = pd.read_csv(path)
+    """
+    Load historical OHLCV data and normalize numeric/date columns.
+
+    Parameters:
+        path (str | Path): Path to the CSV file containing price data.
+    Returns:
+        pd.DataFrame: Cleaned price DataFrame with required columns and types.
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If required columns are missing.
+    """
+    try:
+        df = pd.read_csv(path)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Price file not found at {path}. Please check the path and try again.") from e
+    except Exception as e:
+        raise RuntimeError(f"Failed to read price CSV: {e}") from e
     return normalize_price_data(df)
 
 
 def normalize_price_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize historical OHLCV data from CSV files or yfinance downloads."""
+    """
+    Normalize historical OHLCV data from CSV files or yfinance downloads.
+
+    Parameters:
+        df (pd.DataFrame): Raw price DataFrame.
+    Returns:
+        pd.DataFrame: Cleaned and normalized price DataFrame.
+    Raises:
+        ValueError: If required columns are missing or no valid records remain after cleaning.
+    """
     df = df.copy()
 
     if isinstance(df.columns, pd.MultiIndex):
@@ -50,9 +93,8 @@ def normalize_price_data(df: pd.DataFrame) -> pd.DataFrame:
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    return (
-        df.dropna(subset=["Date", "Close", "Adj Close"])
-        .sort_values("Date")
-        .reset_index(drop=True)
-    )
+    df = df.dropna(subset=["Date", "Close", "Adj Close"])
+    if df.empty:
+        raise ValueError("No valid price records found after cleaning. Check input data for required fields and formats.")
+    return df.sort_values("Date").reset_index(drop=True)
 

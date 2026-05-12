@@ -4,30 +4,51 @@ from src.sentiment import classify_sentiment
 
 
 def align_news_to_trading_days(news: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
-    """Map each article to the same or next available trading day for its stock."""
-    news_df = news.copy()
-    price_days = (
-        prices[["stock", "Date"]]
-        .drop_duplicates()
-        .assign(Date=lambda df: pd.to_datetime(df["Date"]).dt.normalize())
-        .sort_values(["stock", "Date"])
-    )
+    """
+    Map each article to the same or next available trading day for its stock.
 
-    news_df["article_day"] = pd.to_datetime(news_df["date"], utc=True).dt.tz_convert(None).dt.normalize()
-    news_df = news_df.sort_values(["stock", "article_day"])
+    Parameters:
+        news (pd.DataFrame): News DataFrame with 'date' and 'stock'.
+        prices (pd.DataFrame): Price DataFrame with 'Date' and 'stock'.
+    Returns:
+        pd.DataFrame: News DataFrame with 'trading_day' column.
+    Raises:
+        ValueError: If merge fails or required columns are missing.
+    """
+    try:
+        news_df = news.copy()
+        price_days = (
+            prices[["stock", "Date"]]
+            .drop_duplicates()
+            .assign(Date=lambda df: pd.to_datetime(df["Date"]).dt.normalize())
+            .sort_values(["stock", "Date"])
+        )
 
-    aligned = pd.merge_asof(
-        news_df,
-        price_days,
-        left_on="article_day",
-        right_on="Date",
-        by="stock",
-        direction="forward",
-    )
-    return aligned.rename(columns={"Date": "trading_day"})
+        news_df["article_day"] = pd.to_datetime(news_df["date"], utc=True).dt.tz_convert(None).dt.normalize()
+        news_df = news_df.sort_values(["stock", "article_day"])
+
+        aligned = pd.merge_asof(
+            news_df,
+            price_days,
+            left_on="article_day",
+            right_on="Date",
+            by="stock",
+            direction="forward",
+        )
+        return aligned.rename(columns={"Date": "trading_day"})
+    except Exception as e:
+        raise RuntimeError(f"Failed to align news to trading days: {e}") from e
 
 
 def aggregate_daily_sentiment(aligned_news: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregate daily sentiment for each stock and trading day.
+
+    Parameters:
+        aligned_news (pd.DataFrame): News DataFrame with 'trading_day'.
+    Returns:
+        pd.DataFrame: Aggregated sentiment and article count per stock-day.
+    """
     return (
         aligned_news.dropna(subset=["trading_day"])
         .groupby(["stock", "trading_day"], as_index=False)
@@ -39,6 +60,14 @@ def aggregate_daily_sentiment(aligned_news: pd.DataFrame) -> pd.DataFrame:
 
 
 def prepare_price_returns(prices: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute daily returns for each stock.
+
+    Parameters:
+        prices (pd.DataFrame): Price DataFrame with 'Adj Close'.
+    Returns:
+        pd.DataFrame: DataFrame with daily return percentage.
+    """
     df = prices.copy()
     df["Date"] = pd.to_datetime(df["Date"]).dt.normalize()
     df = df.sort_values(["stock", "Date"])
@@ -47,18 +76,34 @@ def prepare_price_returns(prices: pd.DataFrame) -> pd.DataFrame:
 
 
 def sentiment_return_dataset(news_sentiment: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
-    aligned = align_news_to_trading_days(news_sentiment, prices)
-    daily_sentiment = aggregate_daily_sentiment(aligned)
-    returns = prepare_price_returns(prices)
-    merged = daily_sentiment.merge(
-        returns,
-        left_on=["stock", "trading_day"],
-        right_on=["stock", "Date"],
-        how="inner",
-    )
-    merged = merged.drop(columns=["Date"])
-    merged["sentiment_category"] = merged["avg_sentiment"].map(classify_sentiment)
-    return merged
+    """
+    Merge daily sentiment and returns for correlation analysis.
+
+    Parameters:
+        news_sentiment (pd.DataFrame): News DataFrame with sentiment scores.
+        prices (pd.DataFrame): Price DataFrame.
+    Returns:
+        pd.DataFrame: DataFrame with sentiment, returns, and sentiment category.
+    Raises:
+        RuntimeError: If merge fails or results in empty DataFrame.
+    """
+    try:
+        aligned = align_news_to_trading_days(news_sentiment, prices)
+        daily_sentiment = aggregate_daily_sentiment(aligned)
+        returns = prepare_price_returns(prices)
+        merged = daily_sentiment.merge(
+            returns,
+            left_on=["stock", "trading_day"],
+            right_on=["stock", "Date"],
+            how="inner",
+        )
+        merged = merged.drop(columns=["Date"])
+        merged["sentiment_category"] = merged["avg_sentiment"].map(classify_sentiment)
+        if merged.empty:
+            raise ValueError("No matched sentiment/return records after merging. Check data alignment and coverage.")
+        return merged
+    except Exception as e:
+        raise RuntimeError(f"Failed to merge sentiment and returns: {e}") from e
 
 
 def pearson_correlation(dataset: pd.DataFrame) -> float:

@@ -9,6 +9,10 @@ Thumbs.db
 
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/README.md
+!data/raw/prices/
+data/raw/prices/*
+!data/raw/prices/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
 reports/figures/*
